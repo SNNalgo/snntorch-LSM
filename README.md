@@ -8,3 +8,4 @@ Pytorch, Tonic, numpy, sklearn and snntorch
 1. **lsm_weight_definitions.py** - contains definitions of connectivity (Input->Reservoir and Recurrent Reservoir weights)
 2. **lsm_models.py** - contains the LSM model definition.
 3. **main.py** - contains an example implementation with the N-MNIST dataset. Network execution must be run with **torch.no_grad()** for LSM operation
+4. **main.ipynb** - same as main.py but for running in Google Colab. (Make sure to upload this repository folder to Google Drive to run successfully)
