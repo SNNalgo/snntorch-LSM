@@ -35,7 +35,8 @@ if __name__ == "__main__":
 
     data, targets = next(iter(trainloader))
     flat_data = torch.reshape(data, (data.shape[0], data.shape[1], -1))
-    print(flat_data.shape)
+    print('data shape: ', data.shape)
+    print('flat data shape: ', flat_data.shape)
 
     in_sz = flat_data.shape[-1]
 
@@ -47,9 +48,14 @@ if __name__ == "__main__":
     alpha = np.float32(np.exp(-1/tauI))
     beta = np.float32(1 - 1/tauV)
 
-    Win, Wlsm = initWeights1(27, 2, 0.15, in_sz)
+    Nz = 10
+    #Win, Wlsm = initWeights1(27, 2, 0.15, in_sz, Nz=Nz)
+    Win, Wlsm = initWeights1(27, 2, 0.15, in_sz, Nz=Nz)
+    abs_W_lsm = np.abs(Wlsm)
+    print("average fan out: ", np.mean(np.sum(abs_W_lsm>0, axis=1)))
     N = Wlsm.shape[0]
     lsm_net = LSM(N, in_sz, np.float32(curr_prefac*Win), np.float32(curr_prefac*Wlsm), alpha=alpha, beta=beta, th=th).to(device)
+    num_partitions = 3
     lsm_net.eval()
     #Run with no_grad for LSM
     with torch.no_grad():
@@ -58,13 +64,21 @@ if __name__ == "__main__":
             if i%25 == 24:
                 print("train batches completed: ", i)
             flat_data = torch.reshape(data, (data.shape[0], data.shape[1], -1)).to(device)
+            part_steps = flat_data.shape[0]//num_partitions
             spk_rec = lsm_net(flat_data)
-            lsm_out = torch.mean(spk_rec, dim=0)
             if i==0:
+                lsm_parts = []
+                for part in range(num_partitions):
+                    lsm_parts.append(torch.mean(spk_rec[part*part_steps:(part+1)*part_steps], dim=0))
+                lsm_out = torch.cat(lsm_parts, dim=1)
                 in_train = torch.mean(flat_data, dim=0).cpu().numpy()
                 lsm_out_train = lsm_out.cpu().numpy()
                 lsm_label_train = np.int32(targets.numpy())
             else:
+                lsm_parts = []
+                for part in range(num_partitions):
+                    lsm_parts.append(torch.mean(spk_rec[part*part_steps:(part+1)*part_steps], dim=0))
+                lsm_out = torch.cat(lsm_parts, dim=1)
                 in_train = np.concatenate((in_train, torch.mean(flat_data, dim=0).cpu().numpy()), axis=0)
                 lsm_out_train = np.concatenate((lsm_out_train, lsm_out.cpu().numpy()), axis=0)
                 lsm_label_train = np.concatenate((lsm_label_train, np.int32(targets.numpy())), axis=0)
@@ -76,14 +90,21 @@ if __name__ == "__main__":
             if i%25 == 24:
                 print("test batches completed: ", i)
             flat_data = torch.reshape(data, (data.shape[0], data.shape[1], -1)).to(device)
-            lsm_net.eval()
+            part_steps = flat_data.shape[0]//num_partitions
             spk_rec = lsm_net(flat_data)
-            lsm_out = torch.mean(spk_rec, dim=0)
             if i==0:
+                lsm_parts = []
+                for part in range(num_partitions):
+                    lsm_parts.append(torch.mean(spk_rec[part*part_steps:(part+1)*part_steps], dim=0))
+                lsm_out = torch.cat(lsm_parts, dim=1)
                 in_test = torch.mean(flat_data, dim=0).cpu().numpy()
                 lsm_out_test = lsm_out.cpu().numpy()
                 lsm_label_test = np.int32(targets.numpy())
             else:
+                lsm_parts = []
+                for part in range(num_partitions):
+                    lsm_parts.append(torch.mean(spk_rec[part*part_steps:(part+1)*part_steps], dim=0))
+                lsm_out = torch.cat(lsm_parts, dim=1)
                 in_test = np.concatenate((in_test, torch.mean(flat_data, dim=0).cpu().numpy()), axis=0)
                 lsm_out_test = np.concatenate((lsm_out_test, lsm_out.cpu().numpy()), axis=0)
                 lsm_label_test = np.concatenate((lsm_label_test, np.int32(targets.numpy())), axis=0)
